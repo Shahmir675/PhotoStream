@@ -17,12 +17,17 @@ pwd_context = CryptContext(
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a plain password against a hashed password"""
-    return pwd_context.verify(plain_password, hashed_password)
+    # Truncate to 72 bytes to match hashing
+    password_bytes = plain_password.encode('utf-8')[:72]
+    return pwd_context.verify(password_bytes, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Hash a password"""
-    return pwd_context.hash(password)
+    # Bcrypt has a 72-byte limit. Truncate password to avoid errors.
+    # This is safe as 72 bytes is plenty for password entropy.
+    password_bytes = password.encode('utf-8')[:72]
+    return pwd_context.hash(password_bytes)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
