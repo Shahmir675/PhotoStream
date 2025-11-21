@@ -3,11 +3,23 @@ from app.database import get_database
 from app.models.rating import Rating
 from app.schemas.rating import RatingCreate, RatingResponse, PhotoRatingStats
 from bson import ObjectId
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class RatingService:
     def __init__(self):
         self.db = get_database()
+
+    def _check_db(self):
+        """Check if database is available"""
+        if self.db is None:
+            logger.error("Database is not initialized in RatingService")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service unavailable"
+            )
 
     async def create_or_update_rating(
         self,

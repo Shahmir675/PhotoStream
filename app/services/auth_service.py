@@ -5,14 +5,28 @@ from app.schemas.user import UserRegister, UserLogin, Token
 from app.utils.security import get_password_hash, verify_password, create_access_token
 from bson import ObjectId
 from datetime import timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class AuthService:
     def __init__(self):
         self.db = get_database()
 
+    def _check_db(self):
+        """Check if database is available"""
+        if self.db is None:
+            logger.error("Database is not initialized")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service unavailable"
+            )
+
     async def register_consumer(self, user_data: UserRegister) -> User:
         """Register a new consumer user"""
+        self._check_db()
+
         # Check if email already exists
         existing_user = await self.db.users.find_one({"email": user_data.email})
         if existing_user:
@@ -51,6 +65,8 @@ class AuthService:
 
     async def authenticate_user(self, login_data: UserLogin) -> Token:
         """Authenticate user and return JWT token"""
+        self._check_db()
+
         # Find user by email
         user = await self.db.users.find_one({"email": login_data.email})
 
@@ -78,9 +94,12 @@ class AuthService:
 
     async def get_user_by_id(self, user_id: str) -> User:
         """Get user by ID"""
+        self._check_db()
+
         try:
             user = await self.db.users.find_one({"_id": ObjectId(user_id)})
-        except:
+        except Exception as e:
+            logger.error(f"Error fetching user by ID {user_id}: {type(e).__name__}: {e}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"

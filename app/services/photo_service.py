@@ -6,12 +6,24 @@ from app.services.cloudinary_service import CloudinaryService
 from bson import ObjectId
 from typing import List, Optional
 import math
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PhotoService:
     def __init__(self):
         self.db = get_database()
         self.cloudinary_service = CloudinaryService()
+
+    def _check_db(self):
+        """Check if database is available"""
+        if self.db is None:
+            logger.error("Database is not initialized in PhotoService")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Database service unavailable"
+            )
 
     async def create_photo(
         self,
