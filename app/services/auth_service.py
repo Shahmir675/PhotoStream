@@ -30,23 +30,24 @@ class AuthService:
             )
 
         # Create new user
+        from datetime import datetime
         user_dict = {
             "email": user_data.email,
             "username": user_data.username,
             "password_hash": get_password_hash(user_data.password),
-            "role": UserRole.CONSUMER.value,
+            "role": UserRole.CONSUMER.value,  # Store string in DB
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow()
         }
-
-        # Add timestamps
-        from datetime import datetime
-        user_dict["created_at"] = datetime.utcnow()
-        user_dict["updated_at"] = datetime.utcnow()
 
         # Insert user into database
         result = await self.db.users.insert_one(user_dict)
+
+        # Prepare data for User model (with _id for alias mapping)
         user_dict["_id"] = str(result.inserted_id)
 
-        return User(**user_dict)
+        # Use model_validate which properly handles aliases and type conversion
+        return User.model_validate(user_dict)
 
     async def authenticate_user(self, login_data: UserLogin) -> Token:
         """Authenticate user and return JWT token"""
@@ -92,4 +93,4 @@ class AuthService:
             )
 
         user["_id"] = str(user["_id"])
-        return User(**user)
+        return User.model_validate(user)

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List
 from datetime import datetime
 
@@ -8,6 +8,8 @@ class CommentCreate(BaseModel):
 
 
 class CommentResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str = Field(..., alias="_id")
     photo_id: str
     user_id: str
@@ -15,9 +17,6 @@ class CommentResponse(BaseModel):
     content: str
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        populate_by_name = True
 
 
 class CommentListResponse(BaseModel):

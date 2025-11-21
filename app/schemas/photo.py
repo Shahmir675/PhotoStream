@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -18,6 +18,8 @@ class PhotoUpdate(BaseModel):
 
 
 class PhotoResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str = Field(..., alias="_id")
     creator_id: str
     title: str
@@ -29,9 +31,6 @@ class PhotoResponse(BaseModel):
     upload_date: datetime
     average_rating: float
     total_ratings: int
-
-    class Config:
-        populate_by_name = True
 
 
 class PhotoListResponse(BaseModel):

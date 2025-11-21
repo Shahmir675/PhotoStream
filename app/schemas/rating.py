@@ -1,10 +1,11 @@
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class RatingCreate(BaseModel):
     rating: int = Field(..., ge=1, le=5)
 
-    @validator('rating')
+    @field_validator('rating')
+    @classmethod
     def validate_rating(cls, v):
         if v < 1 or v > 5:
             raise ValueError('Rating must be between 1 and 5')
@@ -12,13 +13,12 @@ class RatingCreate(BaseModel):
 
 
 class RatingResponse(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     id: str = Field(..., alias="_id")
     photo_id: str
     user_id: str
     rating: int
-
-    class Config:
-        populate_by_name = True
 
 
 class PhotoRatingStats(BaseModel):

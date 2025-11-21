@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -11,6 +11,11 @@ class PhotoMetadata(BaseModel):
 
 
 class Photo(BaseModel):
+    model_config = ConfigDict(
+        populate_by_name=True,
+        json_encoders={datetime: lambda v: v.isoformat()}
+    )
+
     id: Optional[str] = Field(None, alias="_id")
     creator_id: str
     title: str
@@ -24,7 +29,3 @@ class Photo(BaseModel):
     average_rating: float = 0.0
     total_ratings: int = 0
     metadata: Optional[PhotoMetadata] = None
-
-    class Config:
-        populate_by_name = True
-        json_encoders = {datetime: lambda v: v.isoformat()}
