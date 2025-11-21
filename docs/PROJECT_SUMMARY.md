@@ -40,7 +40,8 @@
 
 ### User Management
 - Consumer registration via API
-- Creator accounts via script
+- Creator accounts via API or script
+- Role upgrade endpoint (consumer → creator)
 - JWT-based authentication
 - Role-based authorization
 - Secure password hashing
@@ -116,7 +117,7 @@ PhotoStream/
 
 - **Total Files**: 35+
 - **Lines of Code**: 2000+
-- **API Endpoints**: 15+
+- **API Endpoints**: 16+
 - **Database Collections**: 4
 - **Services Integrated**: 3 (MongoDB, Cloudinary, Render)
 - **Tests**: Comprehensive test suite

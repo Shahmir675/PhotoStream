@@ -63,3 +63,27 @@ async def get_current_user_info(current_user: User = Depends(get_current_user)):
         role=current_user.role,
         created_at=current_user.created_at
     )
+
+
+@router.post("/upgrade-to-creator", response_model=UserResponse)
+async def upgrade_to_creator(current_user: User = Depends(get_current_user)):
+    """Upgrade current user to creator role"""
+    try:
+        auth_service = AuthService()
+        updated_user = await auth_service.upgrade_to_creator(current_user.id)
+
+        return UserResponse(
+            _id=updated_user.id,
+            email=updated_user.email,
+            username=updated_user.username,
+            role=updated_user.role,
+            created_at=updated_user.created_at
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Role upgrade failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to upgrade user role"
+        )

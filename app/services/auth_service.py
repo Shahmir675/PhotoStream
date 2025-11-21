@@ -113,3 +113,29 @@ class AuthService:
 
         user["_id"] = str(user["_id"])
         return User.model_validate(user)
+
+    async def upgrade_to_creator(self, user_id: str) -> User:
+        """Upgrade user role to creator"""
+        self._check_db()
+
+        from datetime import datetime
+
+        # Update user role
+        result = await self.db.users.update_one(
+            {"_id": ObjectId(user_id)},
+            {
+                "$set": {
+                    "role": UserRole.CREATOR.value,
+                    "updated_at": datetime.utcnow()
+                }
+            }
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        # Get updated user
+        return await self.get_user_by_id(user_id)

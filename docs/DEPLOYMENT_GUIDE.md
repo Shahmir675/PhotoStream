@@ -221,15 +221,40 @@ git push origin main
 
 ## 👤 Step 5: Create Creator Account
 
-Since there's no public registration for creators, use the script:
+There are multiple ways to create creator accounts:
 
-### 5.1 Locally
+### 5.1 Via API (Easiest for Testing)
+
+First, register and login as a consumer, then upgrade:
+
+```bash
+# Register consumer
+curl -X POST "https://your-app.onrender.com/api/auth/register-consumer" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"creator@example.com","username":"creator1","password":"securepass123"}'
+
+# Login
+curl -X POST "https://your-app.onrender.com/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"creator@example.com","password":"securepass123"}'
+
+# Copy the access_token from the response, then upgrade
+curl -X POST "https://your-app.onrender.com/api/auth/upgrade-to-creator" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN"
+
+# Login again to get a new token with creator role
+curl -X POST "https://your-app.onrender.com/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"creator@example.com","password":"securepass123"}'
+```
+
+### 5.2 Using Script Locally
 
 ```bash
 python scripts/create_creator.py
 ```
 
-### 5.2 On Render (using Shell)
+### 5.3 On Render (using Shell)
 
 1. Go to your Render service dashboard
 2. Click "Shell" tab

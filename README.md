@@ -148,7 +148,36 @@ The API will be available at `http://localhost:8000`
 
 ## 🔑 Creating Creator Accounts
 
-Since there's no public interface for creator enrollment, use the provided script:
+There are two ways to create creator accounts:
+
+### Option 1: API Endpoint (Recommended for Testing)
+
+Upgrade an existing consumer account to creator via API:
+
+```bash
+# 1. Register as consumer
+curl -X POST "http://localhost:8000/api/auth/register-consumer" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","username":"user","password":"password123"}'
+
+# 2. Login
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+
+# 3. Upgrade to creator (using token from step 2)
+curl -X POST "http://localhost:8000/api/auth/upgrade-to-creator" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# 4. Login again to get new token with creator role
+curl -X POST "http://localhost:8000/api/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+```
+
+### Option 2: Database Script
+
+Use the provided script to create a creator account directly:
 
 ```bash
 python scripts/create_creator.py
@@ -165,6 +194,7 @@ Follow the prompts to create a creator account.
 | POST | `/api/auth/register-consumer` | Register consumer user | No |
 | POST | `/api/auth/login` | Login and get JWT token | No |
 | GET | `/api/auth/me` | Get current user info | Yes |
+| POST | `/api/auth/upgrade-to-creator` | Upgrade user to creator role | Yes |
 
 ### Creator Endpoints
 

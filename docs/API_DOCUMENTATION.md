@@ -101,6 +101,55 @@ Get authenticated user information.
 
 ---
 
+### Upgrade to Creator
+
+Upgrade the current authenticated user from consumer to creator role.
+
+**Endpoint:** `POST /api/auth/upgrade-to-creator`
+
+**Headers:** `Authorization: Bearer TOKEN`
+
+**Response:** `200 OK`
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "email": "consumer@example.com",
+  "username": "consumer1",
+  "role": "creator",
+  "created_at": "2024-01-15T10:30:00"
+}
+```
+
+**Notes:**
+- After upgrading to creator, you must login again to receive a new JWT token with the updated role
+- The old token will still contain the "consumer" role and won't work for creator endpoints
+- This endpoint is useful for testing and development
+
+**Example Workflow:**
+```bash
+# 1. Login as consumer
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+
+# 2. Upgrade to creator (using token from step 1)
+curl -X POST http://localhost:8000/api/auth/upgrade-to-creator \
+  -H "Authorization: Bearer OLD_TOKEN"
+
+# 3. Login again to get new token with creator role
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"password123"}'
+
+# 4. Now you can use creator endpoints with the new token
+```
+
+**Errors:**
+- `401`: Invalid or expired token
+- `404`: User not found
+
+---
+
 ## 📸 Creator Endpoints
 
 ### Upload Photo

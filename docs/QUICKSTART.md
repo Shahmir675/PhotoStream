@@ -89,6 +89,25 @@ curl -X POST http://localhost:8000/api/auth/login \
 
 ### Create a Creator Account
 
+**Option 1: Upgrade via API (Easiest)**
+```bash
+# First, login with your consumer account to get a token
+TOKEN=$(curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}' \
+  | jq -r '.access_token')
+
+# Upgrade to creator
+curl -X POST http://localhost:8000/api/auth/upgrade-to-creator \
+  -H "Authorization: Bearer $TOKEN"
+
+# Login again to get new token with creator role
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"password123"}'
+```
+
+**Option 2: Use Script**
 ```bash
 python scripts/create_creator.py
 ```
