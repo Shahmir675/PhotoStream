@@ -1,33 +1,56 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from app.schemas.user import UserRegister, UserLogin, Token, UserResponse
 from app.services.auth_service import AuthService
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
 @router.post("/register-consumer", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register_consumer(user_data: UserRegister):
     """Register a new consumer user"""
-    auth_service = AuthService()
-    user = await auth_service.register_consumer(user_data)
+    try:
+        auth_service = AuthService()
+        user = await auth_service.register_consumer(user_data)
 
-    return UserResponse(
-        _id=user.id,
-        email=user.email,
-        username=user.username,
-        role=user.role,
-        created_at=user.created_at
-    )
+        return UserResponse(
+            _id=user.id,
+            email=user.email,
+            username=user.username,
+            role=user.role,
+            created_at=user.created_at
+        )
+    except HTTPException:
+        # Re-raise HTTPExceptions (400, 401, etc.) as-is
+        raise
+    except Exception as e:
+        # Log the actual error for debugging
+        logger.error(f"Registration failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Registration failed. Please try again later. Error: {type(e).__name__}"
+        )
 
 
 @router.post("/login", response_model=Token)
 async def login(login_data: UserLogin):
     """Login and get JWT token"""
-    auth_service = AuthService()
-    token = await auth_service.authenticate_user(login_data)
-    return token
+    try:
+        auth_service = AuthService()
+        token = await auth_service.authenticate_user(login_data)
+        return token
+    except HTTPException:
+        # Re-raise HTTPExceptions (401, etc.) as-is
+        raise
+    except Exception as e:
+        logger.error(f"Login failed: {type(e).__name__}: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Login failed. Please try again later."
+        )
 
 
 @router.get("/me", response_model=UserResponse)

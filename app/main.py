@@ -59,11 +59,35 @@ async def root():
 @app.get("/api/health", tags=["Health"])
 async def health_check():
     """Detailed health check"""
-    return {
-        "status": "healthy",
-        "database": "connected",
+    from app.database import get_database
+
+    db_status = "disconnected"
+    db_error = None
+
+    try:
+        db = get_database()
+        if db is None:
+            db_status = "disconnected"
+            db_error = "Database not initialized"
+        else:
+            # Actually test the database connection
+            await db.command('ping')
+            db_status = "connected"
+    except Exception as e:
+        db_status = "error"
+        db_error = f"{type(e).__name__}: {str(e)}"
+        logging.error(f"Health check database error: {db_error}")
+
+    response = {
+        "status": "healthy" if db_status == "connected" else "unhealthy",
+        "database": db_status,
         "api_version": "1.0.0"
     }
+
+    if db_error:
+        response["database_error"] = db_error
+
+    return response
 
 
 # Include routers

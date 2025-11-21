@@ -6,7 +6,13 @@ from app.config import settings
 from app.schemas.user import TokenData
 
 # Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Reduced bcrypt rounds from default 12 to 10 for better performance on free tier servers
+# Still secure (1024 iterations) but faster
+pwd_context = CryptContext(
+    schemes=["bcrypt"],
+    deprecated="auto",
+    bcrypt__rounds=10
+)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
