@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection
 from app.services.cache_service import cache_service
@@ -20,6 +21,9 @@ app = FastAPI(
     docs_url="/api/docs",
     redoc_url="/api/redoc"
 )
+
+# Add GZip compression for faster responses
+app.add_middleware(GZipMiddleware, minimum_size=500)
 
 # Configure CORS
 app.add_middleware(
