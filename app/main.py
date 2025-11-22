@@ -4,7 +4,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection
 from app.services.cache_service import cache_service
-from app.routes import auth, creator, photos, comments, ratings
+from app.routes import auth, creator, photos, comments, ratings, discovery
 import logging
 
 # Configure logging
@@ -120,6 +120,7 @@ app.include_router(creator.router)
 app.include_router(photos.router)
 app.include_router(comments.router)
 app.include_router(ratings.router)
+app.include_router(discovery.router)
 
 
 if __name__ == "__main__":

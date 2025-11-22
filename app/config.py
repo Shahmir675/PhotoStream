@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     # CORS Settings
     cors_origins: List[str] = ["*"]
 
+    # Regional Routing Settings
+    region_name: str = "us-west"
+    server_us_west: str = "https://photostream-api-us-west.onrender.com"
+    server_us_east: str = "https://photostream-api-us-east.onrender.com"
+    server_eu: str = "https://photostream-api-eu.onrender.com"
+
     class Config:
         env_file = ".env"
         case_sensitive = False
