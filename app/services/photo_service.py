@@ -3,6 +3,7 @@ from app.database import get_database
 from app.models.photo import Photo, PhotoMetadata
 from app.schemas.photo import PhotoCreate, PhotoUpdate, PhotoResponse, PhotoListResponse
 from app.services.cloudinary_service import CloudinaryService
+from app.services.cache_service import cache_service
 from bson import ObjectId
 from typing import List, Optional
 import math
@@ -63,6 +64,10 @@ class PhotoService:
         result = await self.db.photos.insert_one(photo_dict)
         photo_dict["_id"] = str(result.inserted_id)
 
+        # Invalidate cache for creator's photos and photo listings
+        await cache_service.delete_pattern(f"photos:*")
+        await cache_service.delete_pattern(f"creator_photos:{creator_id}")
+
         return PhotoResponse(**photo_dict)
 
     async def get_photos(
@@ -73,6 +78,15 @@ class PhotoService:
         location: Optional[str] = None
     ) -> PhotoListResponse:
         """Get all photos with pagination and search"""
+        # Create cache key based on parameters
+        cache_key = f"photos:page:{page}:size:{page_size}:search:{search}:location:{location}"
+
+        # Try to get from cache
+        cached_result = await cache_service.get(cache_key)
+        if cached_result:
+            logger.info(f"Cache hit for {cache_key}")
+            return PhotoListResponse(**cached_result)
+
         # Build query
         query = {}
 
@@ -102,7 +116,7 @@ class PhotoService:
             photo["_id"] = str(photo["_id"])
             photo_responses.append(PhotoResponse(**photo))
 
-        return PhotoListResponse(
+        result = PhotoListResponse(
             photos=photo_responses,
             total=total,
             page=page,
@@ -110,8 +124,21 @@ class PhotoService:
             total_pages=total_pages
         )
 
+        # Cache the result
+        await cache_service.set(cache_key, result.dict())
+        logger.info(f"Cached result for {cache_key}")
+
+        return result
+
     async def get_photo_by_id(self, photo_id: str) -> PhotoResponse:
         """Get photo by ID"""
+        # Try to get from cache
+        cache_key = f"photo:{photo_id}"
+        cached_photo = await cache_service.get(cache_key)
+        if cached_photo:
+            logger.info(f"Cache hit for photo {photo_id}")
+            return PhotoResponse(**cached_photo)
+
         try:
             photo = await self.db.photos.find_one({"_id": ObjectId(photo_id)})
         except:
@@ -127,10 +154,23 @@ class PhotoService:
             )
 
         photo["_id"] = str(photo["_id"])
-        return PhotoResponse(**photo)
+        photo_response = PhotoResponse(**photo)
+
+        # Cache the photo
+        await cache_service.set(cache_key, photo_response.dict())
+        logger.info(f"Cached photo {photo_id}")
+
+        return photo_response
 
     async def get_creator_photos(self, creator_id: str) -> List[PhotoResponse]:
         """Get all photos by a creator"""
+        # Try to get from cache
+        cache_key = f"creator_photos:{creator_id}"
+        cached_photos = await cache_service.get(cache_key)
+        if cached_photos:
+            logger.info(f"Cache hit for creator {creator_id} photos")
+            return [PhotoResponse(**photo) for photo in cached_photos]
+
         cursor = self.db.photos.find({"creator_id": creator_id}).sort("upload_date", -1)
         photos = await cursor.to_list(length=None)
 
@@ -138,6 +178,10 @@ class PhotoService:
         for photo in photos:
             photo["_id"] = str(photo["_id"])
             photo_responses.append(PhotoResponse(**photo))
+
+        # Cache the creator's photos
+        await cache_service.set(cache_key, [photo.dict() for photo in photo_responses])
+        logger.info(f"Cached creator {creator_id} photos")
 
         return photo_responses
 
@@ -182,6 +226,11 @@ class PhotoService:
         updated_photo = await self.db.photos.find_one({"_id": ObjectId(photo_id)})
         updated_photo["_id"] = str(updated_photo["_id"])
 
+        # Invalidate cache for this photo and related listings
+        await cache_service.delete(f"photo:{photo_id}")
+        await cache_service.delete_pattern(f"photos:*")
+        await cache_service.delete_pattern(f"creator_photos:{creator_id}")
+
         return PhotoResponse(**updated_photo)
 
     async def delete_photo(self, photo_id: str, creator_id: str) -> bool:
@@ -216,5 +265,11 @@ class PhotoService:
         # Delete associated comments and ratings
         await self.db.comments.delete_many({"photo_id": photo_id})
         await self.db.ratings.delete_many({"photo_id": photo_id})
+
+        # Invalidate cache for this photo and related listings
+        await cache_service.delete(f"photo:{photo_id}")
+        await cache_service.delete_pattern(f"photos:*")
+        await cache_service.delete_pattern(f"creator_photos:{creator_id}")
+        await cache_service.delete_pattern(f"ratings:photo:{photo_id}")
 
         return True

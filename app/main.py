@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import connect_to_mongo, close_mongo_connection
+from app.services.cache_service import cache_service
 from app.routes import auth, creator, photos, comments, ratings
 import logging
 
@@ -33,15 +34,17 @@ app.add_middleware(
 # Event handlers
 @app.on_event("startup")
 async def startup_event():
-    """Connect to MongoDB on startup"""
+    """Connect to MongoDB and Redis on startup"""
     await connect_to_mongo()
+    await cache_service.connect()
     logging.info("PhotoStream API started successfully")
 
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Close MongoDB connection on shutdown"""
+    """Close MongoDB and Redis connections on shutdown"""
     await close_mongo_connection()
+    await cache_service.disconnect()
     logging.info("PhotoStream API shut down")
 
 
@@ -63,6 +66,8 @@ async def health_check():
 
     db_status = "disconnected"
     db_error = None
+    cache_status = "disconnected"
+    cache_error = None
 
     try:
         db = get_database()
@@ -78,14 +83,29 @@ async def health_check():
         db_error = f"{type(e).__name__}: {str(e)}"
         logging.error(f"Health check database error: {db_error}")
 
+    # Check Redis cache
+    try:
+        if cache_service.enabled and cache_service.redis_client:
+            await cache_service.redis_client.ping()
+            cache_status = "connected"
+        else:
+            cache_status = "disabled"
+    except Exception as e:
+        cache_status = "error"
+        cache_error = f"{type(e).__name__}: {str(e)}"
+        logging.error(f"Health check cache error: {cache_error}")
+
     response = {
         "status": "healthy" if db_status == "connected" else "unhealthy",
         "database": db_status,
+        "cache": cache_status,
         "api_version": "1.0.0"
     }
 
     if db_error:
         response["database_error"] = db_error
+    if cache_error:
+        response["cache_error"] = cache_error
 
     return response
 

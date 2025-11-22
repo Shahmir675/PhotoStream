@@ -2,6 +2,7 @@ from fastapi import HTTPException, status
 from app.database import get_database
 from app.models.rating import Rating
 from app.schemas.rating import RatingCreate, RatingResponse, PhotoRatingStats
+from app.services.cache_service import cache_service
 from bson import ObjectId
 import logging
 
@@ -73,6 +74,10 @@ class RatingService:
         # Update photo's average rating
         await self._update_photo_rating(photo_id)
 
+        # Invalidate cache for photo rating stats and photo details
+        await cache_service.delete(f"ratings:photo:{photo_id}")
+        await cache_service.delete(f"photo:{photo_id}")
+
         # Get the rating to return
         rating = await self.db.ratings.find_one({"_id": rating_id})
         rating["_id"] = str(rating["_id"])
@@ -81,6 +86,13 @@ class RatingService:
 
     async def get_photo_rating_stats(self, photo_id: str) -> PhotoRatingStats:
         """Get rating statistics for a photo"""
+        # Try to get from cache
+        cache_key = f"ratings:photo:{photo_id}"
+        cached_stats = await cache_service.get(cache_key)
+        if cached_stats:
+            logger.info(f"Cache hit for photo {photo_id} rating stats")
+            return PhotoRatingStats(**cached_stats)
+
         # Check if photo exists
         try:
             photo = await self.db.photos.find_one({"_id": ObjectId(photo_id)})
@@ -103,26 +115,32 @@ class RatingService:
         # Calculate statistics
         total_ratings = len(ratings)
         if total_ratings == 0:
-            return PhotoRatingStats(
+            stats = PhotoRatingStats(
                 average_rating=0.0,
                 total_ratings=0,
                 rating_distribution={1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
             )
+        else:
+            # Calculate average
+            total_score = sum(r["rating"] for r in ratings)
+            average_rating = round(total_score / total_ratings, 2)
 
-        # Calculate average
-        total_score = sum(r["rating"] for r in ratings)
-        average_rating = round(total_score / total_ratings, 2)
+            # Calculate distribution
+            rating_distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
+            for rating in ratings:
+                rating_distribution[rating["rating"]] += 1
 
-        # Calculate distribution
-        rating_distribution = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0}
-        for rating in ratings:
-            rating_distribution[rating["rating"]] += 1
+            stats = PhotoRatingStats(
+                average_rating=average_rating,
+                total_ratings=total_ratings,
+                rating_distribution=rating_distribution
+            )
 
-        return PhotoRatingStats(
-            average_rating=average_rating,
-            total_ratings=total_ratings,
-            rating_distribution=rating_distribution
-        )
+        # Cache the stats (use longer TTL for rating stats as they don't change often)
+        await cache_service.set(cache_key, stats.dict(), ttl=600)
+        logger.info(f"Cached photo {photo_id} rating stats")
+
+        return stats
 
     async def _update_photo_rating(self, photo_id: str):
         """Update photo's average rating and total ratings count"""

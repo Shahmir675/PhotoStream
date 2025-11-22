@@ -1,4 +1,5 @@
 services:
+  # Web service
   - type: web
     name: photostream-api
     env: python
@@ -18,5 +19,19 @@ services:
         sync: false
       - key: CLOUDINARY_API_SECRET
         sync: false
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: photostream-redis
+          property: connectionString
+      - key: CACHE_TTL
+        value: 300
       - key: PYTHON_VERSION
         value: 3.11.0
+
+  # Redis service
+  - type: redis
+    name: photostream-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
