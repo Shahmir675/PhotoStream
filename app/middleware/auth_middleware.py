@@ -2,6 +2,7 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.utils.security import decode_access_token
 from app.services.auth_service import AuthService
+from app.services.cache_service import cache_service
 from app.models.user import User, UserRole
 from typing import Optional
 
@@ -11,7 +12,7 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> User:
-    """Get current authenticated user"""
+    """Get current authenticated user with caching"""
     token = credentials.credentials
 
     # Decode token
@@ -24,9 +25,20 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Get user from database
+    # Try to get user from cache first
+    cache_key = f"user:{token_data.user_id}"
+    cached_user = await cache_service.get(cache_key)
+
+    if cached_user:
+        # Reconstruct User object from cached data
+        return User(**cached_user)
+
+    # Get user from database if not in cache
     auth_service = AuthService()
     user = await auth_service.get_user_by_id(token_data.user_id)
+
+    # Cache the user for 15 minutes
+    await cache_service.set(cache_key, user.dict(), ttl=900)
 
     return user
 

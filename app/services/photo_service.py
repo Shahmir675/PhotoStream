@@ -99,15 +99,23 @@ class PhotoService:
         if location:
             query["location"] = {"$regex": location, "$options": "i"}
 
-        # Count total documents
-        total = await self.db.photos.count_documents(query)
+        # Count total documents (use estimated count for first page for better performance)
+        if page == 1 and not search and not location:
+            total = await self.db.photos.estimated_document_count()
+        else:
+            total = await self.db.photos.count_documents(query)
 
         # Calculate pagination
         skip = (page - 1) * page_size
-        total_pages = math.ceil(total / page_size)
+        total_pages = math.ceil(total / page_size) if total > 0 else 1
 
-        # Get photos
-        cursor = self.db.photos.find(query).sort("upload_date", -1).skip(skip).limit(page_size)
+        # Get photos with optimized query (use hint for index)
+        cursor = (self.db.photos
+                  .find(query)
+                  .sort("upload_date", -1)
+                  .skip(skip)
+                  .limit(page_size)
+                  .hint([("upload_date", -1)]))  # Use index hint
         photos = await cursor.to_list(length=page_size)
 
         # Convert ObjectId to string

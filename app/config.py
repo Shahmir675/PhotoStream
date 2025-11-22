@@ -19,7 +19,7 @@ class Settings(BaseSettings):
 
     # Redis Settings
     redis_url: str = "redis://localhost:6379"
-    cache_ttl: int = 300  # 5 minutes default cache TTL
+    cache_ttl: int = 900  # 15 minutes default cache TTL (increased for better performance)
 
     # Application Settings
     max_upload_size: int = 10485760  # 10MB

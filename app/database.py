@@ -61,19 +61,24 @@ async def create_indexes():
     await database.db.users.create_index("email", unique=True)
     await database.db.users.create_index("username", unique=True)
 
-    # Photos collection indexes
+    # Photos collection indexes - optimized compound indexes
     await database.db.photos.create_index("creator_id")
-    await database.db.photos.create_index("title")
-    await database.db.photos.create_index("location")
-    await database.db.photos.create_index("upload_date")
-    await database.db.photos.create_index([("title", "text"), ("caption", "text")])
+    await database.db.photos.create_index([("upload_date", -1)])  # For sorting by latest
+    await database.db.photos.create_index([("location", 1), ("upload_date", -1)])  # Location + sort
+    await database.db.photos.create_index([("average_rating", -1)])  # For sorting by rating
+    await database.db.photos.create_index([("title", "text"), ("caption", "text")])  # Full-text search
+
+    # Compound index for paginated queries
+    await database.db.photos.create_index([("upload_date", -1), ("_id", 1)])
 
     # Comments collection indexes
     await database.db.comments.create_index("photo_id")
     await database.db.comments.create_index("user_id")
+    await database.db.comments.create_index([("photo_id", 1), ("created_at", -1)])  # Comments by photo, sorted
 
     # Ratings collection indexes
     await database.db.ratings.create_index([("photo_id", 1), ("user_id", 1)], unique=True)
+    await database.db.ratings.create_index("photo_id")  # For aggregations
 
     logger.info("Database indexes created successfully")
 
