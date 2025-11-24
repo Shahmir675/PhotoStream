@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File, Query
-from app.schemas.user import UserRegister, UserLogin, Token, UserResponse, ProfilePicturesListResponse, UserProfilePicture
+from fastapi import APIRouter, Depends, status, HTTPException, UploadFile, File
+from app.schemas.user import UserRegister, UserLogin, Token, UserResponse
 from app.services.auth_service import AuthService
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
 from app.services.cloudinary_service import CloudinaryService
 from app.database import get_database
 from app.utils.validators import validate_image_file
+from bson import ObjectId
 import logging
 
 logger = logging.getLogger(__name__)
@@ -112,12 +113,12 @@ async def upload_profile_picture(
         # Update user in database
         db = get_database()
         await db.users.update_one(
-            {"_id": current_user.id},
+            {"_id": ObjectId(current_user.id)},
             {"$set": {"profile_picture_url": upload_result["url"]}}
         )
 
         # Get updated user
-        updated_user = await db.users.find_one({"_id": current_user.id})
+        updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
         if not updated_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -143,82 +144,20 @@ async def upload_profile_picture(
         )
 
 
-@router.get("/profile-pictures", response_model=ProfilePicturesListResponse)
-async def list_profile_pictures(
-    page: int = Query(1, ge=1, description="Page number (starts at 1)"),
-    page_size: int = Query(20, ge=1, le=100, description="Number of items per page"),
-    with_pictures_only: bool = Query(False, description="Only return users with profile pictures")
+@router.get("/profile-picture", response_model=UserResponse)
+async def get_profile_picture(
+    current_user: User = Depends(get_current_user)
 ):
     """
-    List all users with their profile pictures.
+    Get the current user's profile picture.
 
-    This endpoint returns a paginated list of users with their usernames and profile picture URLs.
-    Useful for displaying user galleries, member directories, or avatar lists.
-
-    Query Parameters:
-    - page: Page number (starts at 1)
-    - page_size: Items per page (max 100)
-    - with_pictures_only: If true, only returns users who have uploaded a profile picture
-
-    Returns:
-    - users: List of user profiles with username and profile_picture_url
-    - total: Total number of users matching the criteria
-    - page: Current page number
-    - page_size: Items per page
-    - has_next: Whether there are more pages available
+    Returns the authenticated user's profile information including their profile picture URL.
     """
-    try:
-        db = get_database()
-
-        # Build query filter
-        query_filter = {}
-        if with_pictures_only:
-            query_filter["profile_picture_url"] = {"$ne": None, "$exists": True}
-
-        # Get total count
-        total = await db.users.count_documents(query_filter)
-
-        # Calculate pagination
-        skip = (page - 1) * page_size
-        has_next = (skip + page_size) < total
-
-        # Fetch users with pagination
-        cursor = db.users.find(
-            query_filter,
-            {
-                "_id": 1,
-                "username": 1,
-                "profile_picture_url": 1,
-                "role": 1,
-                "created_at": 1
-            }
-        ).sort("created_at", -1).skip(skip).limit(page_size)
-
-        users_list = await cursor.to_list(length=page_size)
-
-        # Convert to response model
-        users = [
-            UserProfilePicture(
-                _id=str(user["_id"]),
-                username=user["username"],
-                profile_picture_url=user.get("profile_picture_url"),
-                role=user["role"],
-                created_at=user["created_at"]
-            )
-            for user in users_list
-        ]
-
-        return ProfilePicturesListResponse(
-            users=users,
-            total=total,
-            page=page,
-            page_size=page_size,
-            has_next=has_next
-        )
-
-    except Exception as e:
-        logger.error(f"Failed to list profile pictures: {type(e).__name__}: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve profile pictures: {str(e)}"
-        )
+    return UserResponse(
+        _id=current_user.id,
+        email=current_user.email,
+        username=current_user.username,
+        role=current_user.role,
+        profile_picture_url=current_user.profile_picture_url,
+        created_at=current_user.created_at
+    )
