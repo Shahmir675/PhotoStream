@@ -4,6 +4,7 @@ from app.services.auth_service import AuthService
 from app.middleware.auth_middleware import get_current_user
 from app.models.user import User
 from app.services.cloudinary_service import CloudinaryService
+from app.services.cache_service import cache_service
 from app.database import get_database
 from app.utils.validators import validate_image_file
 from bson import ObjectId
@@ -116,6 +117,9 @@ async def upload_profile_picture(
             {"_id": ObjectId(current_user.id)},
             {"$set": {"profile_picture_url": upload_result["url"]}}
         )
+
+        # Invalidate user cache so next request gets fresh data
+        await cache_service.delete(f"user:{current_user.id}")
 
         # Get updated user
         updated_user = await db.users.find_one({"_id": ObjectId(current_user.id)})
