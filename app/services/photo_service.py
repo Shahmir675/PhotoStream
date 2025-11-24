@@ -34,7 +34,8 @@ class PhotoService:
     ) -> PhotoResponse:
         """Create a new photo"""
         # Fetch username from users collection FIRST
-        user = await self.db.users.find_one({"_id": creator_id})
+        # Convert creator_id string to ObjectId for MongoDB query
+        user = await self.db.users.find_one({"_id": ObjectId(creator_id)})
         username = user["username"] if user and "username" in user else "Unknown User"
 
         # Upload to Cloudinary
@@ -124,10 +125,16 @@ class PhotoService:
             {"$sort": {"upload_date": -1}},
             {"$skip": skip},
             {"$limit": page_size},
+            # Convert creator_id string to ObjectId for lookup
+            {
+                "$addFields": {
+                    "creator_id_obj": {"$toObjectId": "$creator_id"}
+                }
+            },
             {
                 "$lookup": {
                     "from": "users",
-                    "localField": "creator_id",
+                    "localField": "creator_id_obj",
                     "foreignField": "_id",
                     "as": "creator"
                 }
@@ -140,12 +147,13 @@ class PhotoService:
             },
             {
                 "$addFields": {
-                    "username": "$creator.username"
+                    "username": {"$ifNull": ["$username", "$creator.username"]}
                 }
             },
             {
                 "$project": {
-                    "creator": 0  # Remove the creator object from response
+                    "creator": 0,  # Remove the creator object from response
+                    "creator_id_obj": 0
                 }
             }
         ])
@@ -188,10 +196,16 @@ class PhotoService:
         try:
             pipeline = [
                 {"$match": {"_id": ObjectId(photo_id)}},
+                # Convert creator_id string to ObjectId for lookup
+                {
+                    "$addFields": {
+                        "creator_id_obj": {"$toObjectId": "$creator_id"}
+                    }
+                },
                 {
                     "$lookup": {
                         "from": "users",
-                        "localField": "creator_id",
+                        "localField": "creator_id_obj",
                         "foreignField": "_id",
                         "as": "creator"
                     }
@@ -204,12 +218,13 @@ class PhotoService:
                 },
                 {
                     "$addFields": {
-                        "username": "$creator.username"
+                        "username": {"$ifNull": ["$username", "$creator.username"]}
                     }
                 },
                 {
                     "$project": {
-                        "creator": 0
+                        "creator": 0,
+                        "creator_id_obj": 0
                     }
                 }
             ]
@@ -252,10 +267,16 @@ class PhotoService:
         pipeline = [
             {"$match": {"creator_id": creator_id}},
             {"$sort": {"upload_date": -1}},
+            # Add a field to convert creator_id string to ObjectId for lookup
+            {
+                "$addFields": {
+                    "creator_id_obj": {"$toObjectId": "$creator_id"}
+                }
+            },
             {
                 "$lookup": {
                     "from": "users",
-                    "localField": "creator_id",
+                    "localField": "creator_id_obj",
                     "foreignField": "_id",
                     "as": "creator"
                 }
@@ -268,12 +289,13 @@ class PhotoService:
             },
             {
                 "$addFields": {
-                    "username": "$creator.username"
+                    "username": {"$ifNull": ["$username", "$creator.username"]}
                 }
             },
             {
                 "$project": {
-                    "creator": 0
+                    "creator": 0,
+                    "creator_id_obj": 0
                 }
             }
         ]
@@ -334,10 +356,16 @@ class PhotoService:
         # Get updated photo with username using aggregation
         pipeline = [
             {"$match": {"_id": ObjectId(photo_id)}},
+            # Convert creator_id string to ObjectId for lookup
+            {
+                "$addFields": {
+                    "creator_id_obj": {"$toObjectId": "$creator_id"}
+                }
+            },
             {
                 "$lookup": {
                     "from": "users",
-                    "localField": "creator_id",
+                    "localField": "creator_id_obj",
                     "foreignField": "_id",
                     "as": "creator"
                 }
@@ -350,12 +378,13 @@ class PhotoService:
             },
             {
                 "$addFields": {
-                    "username": "$creator.username"
+                    "username": {"$ifNull": ["$username", "$creator.username"]}
                 }
             },
             {
                 "$project": {
-                    "creator": 0
+                    "creator": 0,
+                    "creator_id_obj": 0
                 }
             }
         ]
