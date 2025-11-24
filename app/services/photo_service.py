@@ -33,12 +33,17 @@ class PhotoService:
         creator_id: str
     ) -> PhotoResponse:
         """Create a new photo"""
+        # Fetch username from users collection FIRST
+        user = await self.db.users.find_one({"_id": creator_id})
+        username = user["username"] if user and "username" in user else "Unknown User"
+
         # Upload to Cloudinary
         upload_result = await self.cloudinary_service.upload_image(file)
 
-        # Create photo document
+        # Create photo document with username stored directly
         photo_dict = {
             "creator_id": creator_id,
+            "username": username,  # Store username in photo document
             "title": photo_data.title,
             "caption": photo_data.caption,
             "location": photo_data.location,
@@ -60,13 +65,9 @@ class PhotoService:
         from datetime import datetime
         photo_dict["upload_date"] = datetime.utcnow()
 
-        # Insert into database
+        # Insert into database with username
         result = await self.db.photos.insert_one(photo_dict)
         photo_dict["_id"] = str(result.inserted_id)
-
-        # Fetch username from users collection
-        user = await self.db.users.find_one({"_id": creator_id})
-        photo_dict["username"] = user["username"] if user and "username" in user else "Unknown User"
 
         # Invalidate cache for creator's photos and photo listings
         await cache_service.delete_pattern(f"photos:*")
