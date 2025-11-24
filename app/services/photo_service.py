@@ -54,6 +54,7 @@ class PhotoService:
             "thumbnail_url": upload_result["thumbnail_url"],
             "average_rating": 0.0,
             "total_ratings": 0,
+            "total_likes": 0,
             "metadata": {
                 "width": upload_result.get("width"),
                 "height": upload_result.get("height"),

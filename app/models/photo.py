@@ -28,4 +28,5 @@ class Photo(BaseModel):
     upload_date: datetime = Field(default_factory=datetime.utcnow)
     average_rating: float = 0.0
     total_ratings: int = 0
+    total_likes: int = 0
     metadata: Optional[PhotoMetadata] = None

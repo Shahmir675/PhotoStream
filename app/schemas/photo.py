@@ -32,6 +32,7 @@ class PhotoResponse(BaseModel):
     upload_date: datetime
     average_rating: float
     total_ratings: int
+    total_likes: int = 0
 
 
 class PhotoListResponse(BaseModel):
