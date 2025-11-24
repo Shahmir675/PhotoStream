@@ -22,6 +22,7 @@ class PhotoResponse(BaseModel):
 
     id: str = Field(..., alias="_id")
     creator_id: str
+    username: str  # Username of the creator who posted the photo
     title: str
     caption: Optional[str]
     location: Optional[str]

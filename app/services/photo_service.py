@@ -64,6 +64,10 @@ class PhotoService:
         result = await self.db.photos.insert_one(photo_dict)
         photo_dict["_id"] = str(result.inserted_id)
 
+        # Fetch username from users collection
+        user = await self.db.users.find_one({"_id": creator_id})
+        photo_dict["username"] = user["username"] if user and "username" in user else "Unknown User"
+
         # Invalidate cache for creator's photos and photo listings
         await cache_service.delete_pattern(f"photos:*")
         await cache_service.delete_pattern(f"creator_photos:{creator_id}")
@@ -87,41 +91,73 @@ class PhotoService:
             logger.info(f"Cache hit for {cache_key}")
             return PhotoListResponse(**cached_result)
 
-        # Build query
-        query = {}
+        # Build match query
+        match_query = {}
 
         if search:
-            query["$or"] = [
+            match_query["$or"] = [
                 {"title": {"$regex": search, "$options": "i"}},
                 {"caption": {"$regex": search, "$options": "i"}}
             ]
 
         if location:
-            query["location"] = {"$regex": location, "$options": "i"}
+            match_query["location"] = {"$regex": location, "$options": "i"}
 
         # Count total documents (use estimated count for first page for better performance)
         if page == 1 and not search and not location:
             total = await self.db.photos.estimated_document_count()
         else:
-            total = await self.db.photos.count_documents(query)
+            total = await self.db.photos.count_documents(match_query)
 
         # Calculate pagination
         skip = (page - 1) * page_size
         total_pages = math.ceil(total / page_size) if total > 0 else 1
 
-        # Get photos with optimized query (use hint for index)
-        cursor = (self.db.photos
-                  .find(query)
-                  .sort("upload_date", -1)
-                  .skip(skip)
-                  .limit(page_size)
-                  .hint([("upload_date", -1)]))  # Use index hint
+        # Use aggregation pipeline to join with users collection
+        pipeline = []
+
+        if match_query:
+            pipeline.append({"$match": match_query})
+
+        pipeline.extend([
+            {"$sort": {"upload_date": -1}},
+            {"$skip": skip},
+            {"$limit": page_size},
+            {
+                "$lookup": {
+                    "from": "users",
+                    "localField": "creator_id",
+                    "foreignField": "_id",
+                    "as": "creator"
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$creator",
+                    "preserveNullAndEmptyArrays": True
+                }
+            },
+            {
+                "$addFields": {
+                    "username": "$creator.username"
+                }
+            },
+            {
+                "$project": {
+                    "creator": 0  # Remove the creator object from response
+                }
+            }
+        ])
+
+        cursor = self.db.photos.aggregate(pipeline)
         photos = await cursor.to_list(length=page_size)
 
-        # Convert ObjectId to string
+        # Convert ObjectId to string and handle missing usernames
         photo_responses = []
         for photo in photos:
             photo["_id"] = str(photo["_id"])
+            if "username" not in photo or photo["username"] is None:
+                photo["username"] = "Unknown User"
             photo_responses.append(PhotoResponse(**photo))
 
         result = PhotoListResponse(
@@ -147,8 +183,38 @@ class PhotoService:
             logger.info(f"Cache hit for photo {photo_id}")
             return PhotoResponse(**cached_photo)
 
+        # Use aggregation to join with users collection
         try:
-            photo = await self.db.photos.find_one({"_id": ObjectId(photo_id)})
+            pipeline = [
+                {"$match": {"_id": ObjectId(photo_id)}},
+                {
+                    "$lookup": {
+                        "from": "users",
+                        "localField": "creator_id",
+                        "foreignField": "_id",
+                        "as": "creator"
+                    }
+                },
+                {
+                    "$unwind": {
+                        "path": "$creator",
+                        "preserveNullAndEmptyArrays": True
+                    }
+                },
+                {
+                    "$addFields": {
+                        "username": "$creator.username"
+                    }
+                },
+                {
+                    "$project": {
+                        "creator": 0
+                    }
+                }
+            ]
+            cursor = self.db.photos.aggregate(pipeline)
+            photos = await cursor.to_list(length=1)
+            photo = photos[0] if photos else None
         except:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -162,6 +228,8 @@ class PhotoService:
             )
 
         photo["_id"] = str(photo["_id"])
+        if "username" not in photo or photo["username"] is None:
+            photo["username"] = "Unknown User"
         photo_response = PhotoResponse(**photo)
 
         # Cache the photo
@@ -179,12 +247,44 @@ class PhotoService:
             logger.info(f"Cache hit for creator {creator_id} photos")
             return [PhotoResponse(**photo) for photo in cached_photos]
 
-        cursor = self.db.photos.find({"creator_id": creator_id}).sort("upload_date", -1)
+        # Use aggregation to join with users collection
+        pipeline = [
+            {"$match": {"creator_id": creator_id}},
+            {"$sort": {"upload_date": -1}},
+            {
+                "$lookup": {
+                    "from": "users",
+                    "localField": "creator_id",
+                    "foreignField": "_id",
+                    "as": "creator"
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$creator",
+                    "preserveNullAndEmptyArrays": True
+                }
+            },
+            {
+                "$addFields": {
+                    "username": "$creator.username"
+                }
+            },
+            {
+                "$project": {
+                    "creator": 0
+                }
+            }
+        ]
+
+        cursor = self.db.photos.aggregate(pipeline)
         photos = await cursor.to_list(length=None)
 
         photo_responses = []
         for photo in photos:
             photo["_id"] = str(photo["_id"])
+            if "username" not in photo or photo["username"] is None:
+                photo["username"] = "Unknown User"
             photo_responses.append(PhotoResponse(**photo))
 
         # Cache the creator's photos
@@ -230,9 +330,47 @@ class PhotoService:
                 {"$set": update_data}
             )
 
-        # Get updated photo
-        updated_photo = await self.db.photos.find_one({"_id": ObjectId(photo_id)})
+        # Get updated photo with username using aggregation
+        pipeline = [
+            {"$match": {"_id": ObjectId(photo_id)}},
+            {
+                "$lookup": {
+                    "from": "users",
+                    "localField": "creator_id",
+                    "foreignField": "_id",
+                    "as": "creator"
+                }
+            },
+            {
+                "$unwind": {
+                    "path": "$creator",
+                    "preserveNullAndEmptyArrays": True
+                }
+            },
+            {
+                "$addFields": {
+                    "username": "$creator.username"
+                }
+            },
+            {
+                "$project": {
+                    "creator": 0
+                }
+            }
+        ]
+        cursor = self.db.photos.aggregate(pipeline)
+        photos = await cursor.to_list(length=1)
+        updated_photo = photos[0] if photos else None
+
+        if not updated_photo:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Photo not found after update"
+            )
+
         updated_photo["_id"] = str(updated_photo["_id"])
+        if "username" not in updated_photo or updated_photo["username"] is None:
+            updated_photo["username"] = "Unknown User"
 
         # Invalidate cache for this photo and related listings
         await cache_service.delete(f"photo:{photo_id}")

@@ -16,6 +16,7 @@ cloudinary.config(
 class CloudinaryService:
     def __init__(self):
         self.folder = "photostream"
+        self.profile_folder = "photostream/profiles"
 
     async def upload_image(self, file: UploadFile) -> Dict[str, str]:
         """Upload image to Cloudinary"""
@@ -72,3 +73,38 @@ class CloudinaryService:
                 status_code=500,
                 detail=f"Failed to delete image: {str(e)}"
             )
+
+    async def upload_profile_picture(self, file: UploadFile, user_id: str) -> Dict[str, str]:
+        """Upload profile picture to Cloudinary"""
+        try:
+            # Read file content
+            contents = await file.read()
+
+            # Upload to Cloudinary with specific transformations for profile pictures
+            result = cloudinary.uploader.upload(
+                contents,
+                folder=self.profile_folder,
+                public_id=f"user_{user_id}",
+                overwrite=True,  # Replace existing profile picture
+                resource_type="image",
+                format="jpg",
+                transformation=[
+                    {'width': 400, 'height': 400, 'crop': "fill", 'gravity': "face"},
+                    {'quality': "auto:good"},
+                    {'fetch_format': "auto"}
+                ]
+            )
+
+            return {
+                "public_id": result['public_id'],
+                "url": result['secure_url']
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload profile picture: {str(e)}"
+            )
+        finally:
+            # Reset file pointer
+            await file.seek(0)

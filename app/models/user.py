@@ -20,5 +20,6 @@ class User(BaseModel):
     username: str
     password_hash: str
     role: UserRole
+    profile_picture_url: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
