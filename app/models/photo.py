@@ -10,6 +10,27 @@ class PhotoMetadata(BaseModel):
     size: Optional[int] = None
 
 
+class PhotoAIModeration(BaseModel):
+    is_adult_content: Optional[bool] = None
+    is_racy_content: Optional[bool] = None
+    is_gory_content: Optional[bool] = None
+    adult_score: Optional[float] = None
+    racy_score: Optional[float] = None
+    gore_score: Optional[float] = None
+
+
+class PhotoAIInsights(BaseModel):
+    tags: List[str] = Field(default_factory=list)
+    objects: List[str] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list)
+    dominant_colors: List[str] = Field(default_factory=list)
+    caption: Optional[str] = None
+    caption_confidence: Optional[float] = None
+    moderation: Optional[PhotoAIModeration] = None
+    model_version: Optional[str] = None
+    analyzed_at: Optional[datetime] = None
+
+
 class Photo(BaseModel):
     model_config = ConfigDict(
         populate_by_name=True,
@@ -30,3 +51,4 @@ class Photo(BaseModel):
     total_ratings: int = 0
     total_likes: int = 0
     metadata: Optional[PhotoMetadata] = None
+    ai_insights: Optional[PhotoAIInsights] = None

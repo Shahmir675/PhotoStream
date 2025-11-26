@@ -4,6 +4,7 @@ from app.models.photo import Photo, PhotoMetadata
 from app.schemas.photo import PhotoCreate, PhotoUpdate, PhotoResponse, PhotoListResponse
 from app.services.cloudinary_service import CloudinaryService
 from app.services.cache_service import cache_service
+from app.services.cognitive_service import cognitive_service
 from bson import ObjectId
 from typing import List, Optional
 import math
@@ -16,6 +17,7 @@ class PhotoService:
     def __init__(self):
         self.db = get_database()
         self.cloudinary_service = CloudinaryService()
+        self.cognitive_service = cognitive_service
 
     def _check_db(self):
         """Check if database is available"""
@@ -41,6 +43,15 @@ class PhotoService:
         # Upload to Cloudinary
         upload_result = await self.cloudinary_service.upload_image(file)
 
+        # Analyze using Azure Cognitive Services (best-effort)
+        ai_insights = None
+        try:
+            analysis = await self.cognitive_service.analyze_image(upload_result["url"])
+            if analysis:
+                ai_insights = self.cognitive_service.build_insights(analysis)
+        except Exception as exc:
+            logger.warning(f"Failed to analyze photo with Azure AI: {exc}")
+
         # Create photo document with username stored directly
         photo_dict = {
             "creator_id": creator_id,
@@ -60,7 +71,8 @@ class PhotoService:
                 "height": upload_result.get("height"),
                 "format": upload_result.get("format"),
                 "size": upload_result.get("size")
-            }
+            },
+            "ai_insights": ai_insights
         }
 
         # Add timestamp
@@ -100,7 +112,10 @@ class PhotoService:
         if search:
             match_query["$or"] = [
                 {"title": {"$regex": search, "$options": "i"}},
-                {"caption": {"$regex": search, "$options": "i"}}
+                {"caption": {"$regex": search, "$options": "i"}},
+                {"ai_insights.caption": {"$regex": search, "$options": "i"}},
+                {"ai_insights.tags": {"$regex": search, "$options": "i"}},
+                {"ai_insights.objects": {"$regex": search, "$options": "i"}},
             ]
 
         if location:

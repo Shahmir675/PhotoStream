@@ -29,6 +29,7 @@ A scalable, cloud-native web application for sharing and interacting with photo-
 - ✅ Pagination and filtering
 - ✅ CI/CD pipeline with GitHub Actions
 - ✅ Free deployment on Render.com
+- ✅ Optional Azure Cognitive Services auto-tagging & safety checks
 
 ## 🏗️ Architecture
 
@@ -99,6 +100,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES=1440
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
 CLOUDINARY_API_SECRET=your-api-secret
+
+AZURE_AI_ENDPOINT=https://your-resource.cognitiveservices.azure.com/
+AZURE_AI_KEY=your-azure-ai-key
 ```
 
 5. **Run the application**
@@ -132,6 +136,14 @@ The API will be available at `http://localhost:8000`
    - 25 GB storage
    - 25 GB bandwidth/month
    - Automatic image optimization
+
+### Azure Cognitive Services (Optional, FREE Tier Available)
+
+1. Visit the [Azure Portal](https://portal.azure.com/) and create a free account.
+2. Create an **Azure AI services** resource (formerly Cognitive Services) in your preferred region.
+3. Once provisioned, copy the endpoint URL and one of the access keys from the Keys & Endpoint blade.
+4. Add `AZURE_AI_ENDPOINT` and `AZURE_AI_KEY` to your `.env`. When present, each uploaded photo is analyzed for tags, captions, colors, and safety signals automatically.
+5. The F0 (free) pricing tier currently allows up to 20 calls per minute and 5,000 calls per month—enough for coursework-scale deployments.
 
 ### Render.com Deployment (FREE)
 
@@ -328,11 +340,30 @@ The project includes GitHub Actions workflow that:
   "upload_date": DateTime,
   "average_rating": Float,
   "total_ratings": Int,
+  "total_likes": Int,
   "metadata": {
     "width": Int,
     "height": Int,
     "format": String,
     "size": Int
+  },
+  "ai_insights": {
+    "tags": [String],
+    "objects": [String],
+    "categories": [String],
+    "dominant_colors": [String],
+    "caption": String,
+    "caption_confidence": Float,
+    "moderation": {
+      "is_adult_content": Boolean,
+      "is_racy_content": Boolean,
+      "is_gory_content": Boolean,
+      "adult_score": Float,
+      "racy_score": Float,
+      "gore_score": Float
+    },
+    "model_version": String,
+    "analyzed_at": DateTime
   }
 }
 ```

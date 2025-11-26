@@ -1,5 +1,5 @@
 from pydantic_settings import BaseSettings
-from typing import List
+from typing import List, Optional
 
 
 class Settings(BaseSettings):
@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     server_us_west: str = "https://photostream-api-us-west.onrender.com"
     server_us_east: str = "https://photostream-api-us-east.onrender.com"
     server_eu: str = "https://photostream-api-eu.onrender.com"
+
+    # Azure Cognitive Services
+    azure_ai_endpoint: Optional[str] = None
+    azure_ai_key: Optional[str] = None
 
     class Config:
         env_file = ".env"

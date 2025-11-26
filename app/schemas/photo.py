@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
+from app.models.photo import PhotoMetadata, PhotoAIInsights
 
 
 class PhotoCreate(BaseModel):
@@ -33,6 +34,8 @@ class PhotoResponse(BaseModel):
     average_rating: float
     total_ratings: int
     total_likes: int = 0
+    metadata: Optional[PhotoMetadata] = None
+    ai_insights: Optional[PhotoAIInsights] = None
 
 
 class PhotoListResponse(BaseModel):
